@@ -21,7 +21,7 @@ public class AuthApplication {
 
 	@Bean
 	Customizer<HttpSecurity> httpSecurityCustomizer() {
-		return h -> h.oauth2AuthorizationServer(a -> a.oidc(Customizer.withDefaults()));
+		return h -> h.oauth2AuthorizationServer(a -> a.oidc(Customizer.withDefaults())); // <.>
 	}
 
 	@Bean
@@ -31,12 +31,13 @@ public class AuthApplication {
 
 	@Bean
 	InMemoryUserDetailsManager inMemoryUserDetailsManager(PasswordEncoder pw) {
-		var users = Stream.of("josh", "greg", "stephane", "arjen")
+		var users = Stream.of("josh", "greg", "stephane", "arjen") // <.>
 			.map(us -> User.withUsername(us).roles("USER").password(pw.encode("pw")).build())
 			.toList();
 		return new InMemoryUserDetailsManager(users);
 	}
 
+	// <.>
 	// 1. usernames/passwords (form, http basic)
 	// 2. x509 mutual tls
 	// 3. one time tokens

@@ -34,51 +34,58 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Objects;
 
+// tag::hints[]
 @SpringBootApplication
-@ImportRuntimeHints(ClientApplication.Hints.class)
+@ImportRuntimeHints(ClientApplication.Hints.class) // <.>
 public class ClientApplication {
 
+	// <.>
 	static class Hints implements RuntimeHintsRegistrar {
 
 		@Override
 		public void registerHints(@NonNull RuntimeHints hints, @Nullable ClassLoader classLoader) {
 			for (var t : JAXB)
-				hints.reflection().registerType(t, MemberCategory.values());
+				hints.reflection().registerType(t, MemberCategory.values()); // <.>
 		}
 
 	}
+
+	// end::hints[]
 
 	public static void main(String[] args) {
 		SpringApplication.run(ClientApplication.class, args);
 	}
 
-	static final Class<?>[] JAXB = new Class[] { MessageRequest.class, MessageResponse.class };
+	// tag::template[]
+	static final Class<?>[] JAXB = new Class[] { MessageRequest.class, MessageResponse.class }; // <.>
 
 	@Bean
 	Jaxb2Marshaller marshaller() {
 		var marshaller = new Jaxb2Marshaller();
-		marshaller.setClassesToBeBound(JAXB);
+		marshaller.setClassesToBeBound(JAXB); // <.>
 		return marshaller;
 	}
 
 	@Bean
 	WebServiceTemplate webServiceTemplate(Jaxb2Marshaller marshaller,
 			OAuthTokenClientInterceptor oAuthTokenClientInterceptor, WebServiceTemplateBuilder builder) {
-		return builder.setDefaultUri("http://localhost:8080/ws")
-			.interceptors(oAuthTokenClientInterceptor)
-			.setUnmarshaller(marshaller)
+		return builder.setDefaultUri("http://localhost:8080/ws") // <.>
+			.interceptors(oAuthTokenClientInterceptor) // <.>
+			.setUnmarshaller(marshaller) // <.>
 			.setMarshaller(marshaller)
 			.build();
 	}
+	// end::template[]
 
 }
 
+// tag::interceptor[]
 @Component
 class OAuthTokenClientInterceptor implements ClientInterceptor {
 
 	private final SecurityContextHolderStrategy strategy = SecurityContextHolder.getContextHolderStrategy();
 
-	private final OAuth2AuthorizedClientManager authorizedClientManager;
+	private final OAuth2AuthorizedClientManager authorizedClientManager; // <.>
 
 	OAuthTokenClientInterceptor(OAuth2AuthorizedClientManager authorizedClientManager) {
 		this.authorizedClientManager = authorizedClientManager;
@@ -87,16 +94,17 @@ class OAuthTokenClientInterceptor implements ClientInterceptor {
 	@Override
 	public boolean handleRequest(@NonNull MessageContext messageContext) throws WebServiceClientException {
 		try {
-			var jwt = this.jwt();
+			var jwt = this.jwt(); // <.>
 			if (messageContext.getRequest() instanceof SaajSoapMessage saajSoapMessage) {
 				var envelope = saajSoapMessage.getSaajMessage().getSOAPPart().getEnvelope();
 				var header = envelope.getHeader();
-				if (header == null)
+				if (header == null) // <.>
 					envelope.addHeader();
-				var securityElement = envelope.getHeader()
+				var securityElement = envelope.getHeader() // <.>
 					.addHeaderElement(envelope.createName("Security", WSConstants.WSSE_NS));
-				var bstElement = securityElement
+				var bstElement = securityElement // <.>
 					.addChildElement(envelope.createName("BinarySecurityToken", WSConstants.WSSE_NS));
+				// <.>
 				bstElement.setTextContent(Base64.getEncoder().encodeToString(jwt.getBytes(StandardCharsets.UTF_8)));
 				return true;
 			}
@@ -108,13 +116,13 @@ class OAuthTokenClientInterceptor implements ClientInterceptor {
 	}
 
 	private String jwt() {
-		var auth = this.strategy.getContext().getAuthentication();
+		var auth = this.strategy.getContext().getAuthentication(); // <.>
 		if (auth instanceof OAuth2AuthenticationToken auth2AuthenticationToken) {
 			var clientId = auth2AuthenticationToken.getAuthorizedClientRegistrationId();
 			var request = OAuth2AuthorizeRequest.withClientRegistrationId(clientId)
 				.principal(auth2AuthenticationToken)
 				.build();
-			var authorizedClient = this.authorizedClientManager.authorize(request);
+			var authorizedClient = this.authorizedClientManager.authorize(request); // <.>
 			return Objects.requireNonNull(authorizedClient).getAccessToken().getTokenValue();
 		}
 		throw new IllegalStateException("could not install JWT token!");
@@ -138,6 +146,9 @@ class OAuthTokenClientInterceptor implements ClientInterceptor {
 
 }
 
+// end::interceptor[]
+
+// tag::controller[]
 @Controller
 @ResponseBody
 class ClientController {
@@ -151,8 +162,9 @@ class ClientController {
 	@GetMapping("/message")
 	MessageResponse message() {
 		var request = new MessageRequest();
-		request.setName("Spring Fans!");
-		return (MessageResponse) this.ws.marshalSendAndReceive(request);
+		request.setName("Spring Fans!"); // <.>
+		return (MessageResponse) this.ws.marshalSendAndReceive(request); // <.>
 	}
 
 }
+// end::controller[]

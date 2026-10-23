@@ -44,12 +44,13 @@ public class WsApplication {
 
 }
 
+// tag::interceptor[]
 @Component
 class OAuthEndpointInterceptor implements EndpointInterceptor {
 
-	private final SecurityContextHolderStrategy strategy = SecurityContextHolder.getContextHolderStrategy();
+	private final SecurityContextHolderStrategy strategy = SecurityContextHolder.getContextHolderStrategy(); // <.>
 
-	private final AuthenticationProvider authenticationProvider;
+	private final AuthenticationProvider authenticationProvider; // <.>
 
 	OAuthEndpointInterceptor(AuthenticationProvider authenticationProvider) {
 		this.authenticationProvider = authenticationProvider;
@@ -57,29 +58,30 @@ class OAuthEndpointInterceptor implements EndpointInterceptor {
 
 	@Override
 	public boolean handleRequest(@NonNull MessageContext messageContext, @NonNull Object endpoint) throws Exception {
-		if (messageContext.getRequest() instanceof SaajSoapMessage saajSoapMessage) {
+		if (messageContext.getRequest() instanceof SaajSoapMessage saajSoapMessage) { // <.>
 			var sm = saajSoapMessage.getSaajMessage();
 			var header = sm.getSOAPHeader();
-			var elements = header.examineAllHeaderElements();
+			var elements = header.examineAllHeaderElements(); // <.>
 			while (elements.hasNext()) {
 				var next = elements.next();
-				if (next.getLocalName().equals("Security")) {
+				if (next.getLocalName().equals("Security")) { // <.>
 					var children = next.getChildElements();
 					while (children.hasNext()) {
 						var child = children.next();
-						if (child.getLocalName().equals("BinarySecurityToken")) {
+						if (child.getLocalName().equals("BinarySecurityToken")) { // <.>
 							var text = child.getTextContent();
-							var jwt = new String(Base64.getDecoder().decode(text), StandardCharsets.UTF_8);
+							var jwt = new String(Base64.getDecoder().decode(text), StandardCharsets.UTF_8); // <.>
 							var bearerTokenAuthentication = new BearerTokenAuthenticationToken(jwt);
-							var authenticated = this.authenticationProvider.authenticate(bearerTokenAuthentication);
+							var authenticated = this.authenticationProvider.authenticate(bearerTokenAuthentication); // <.>
 							if (Objects.requireNonNull(authenticated).isAuthenticated()) {
-								this.strategy.getContext().setAuthentication(authenticated);
+								this.strategy.getContext().setAuthentication(authenticated); // <.>
 								return true;
 							}
 						}
 					}
 				}
 			}
+			// <.>
 			// find Security
 			// find BinarySecurityToken
 			// extract the text value
@@ -89,7 +91,7 @@ class OAuthEndpointInterceptor implements EndpointInterceptor {
 			// install in SCH
 		}
 
-		return false;
+		return false; // <.>
 	}
 
 	@Override
@@ -105,11 +107,13 @@ class OAuthEndpointInterceptor implements EndpointInterceptor {
 	@Override
 	public void afterCompletion(@NonNull MessageContext messageContext, @NonNull Object endpoint,
 			@Nullable Exception ex) throws Exception {
-		strategy.clearContext();
+		strategy.clearContext(); // <.>
 	}
 
 }
+// end::interceptor[]
 
+// tag::configuration[]
 @Configuration
 class EndpointSecurityConfiguration implements WsConfigurer {
 
@@ -117,18 +121,18 @@ class EndpointSecurityConfiguration implements WsConfigurer {
 	// - configure an EndpointInterceptor to extract token and validate it
 	// - install a authentication into SCH
 
-	private final ObjectProvider<@NonNull OAuthEndpointInterceptor> oAuthEndpointInterceptor;
+	private final ObjectProvider<@NonNull OAuthEndpointInterceptor> oAuthEndpointInterceptor; // <.>
 
 	EndpointSecurityConfiguration(ObjectProvider<@NonNull OAuthEndpointInterceptor> oAuthEndpointInterceptor) {
 		this.oAuthEndpointInterceptor = oAuthEndpointInterceptor;
 	}
 
-	@Bean
+	@Bean // <.>
 	JwtDecoder jwtDecoder(@Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String uriOfIssuer) {
 		return NimbusJwtDecoder.withIssuerLocation(uriOfIssuer).build();
 	}
 
-	@Bean
+	@Bean // <.>
 	JwtAuthenticationProvider jwtAuthenticationProvider(JwtDecoder decoder) {
 		return new JwtAuthenticationProvider(decoder);
 	}
@@ -136,22 +140,25 @@ class EndpointSecurityConfiguration implements WsConfigurer {
 	@Bean
 	Customizer<HttpSecurity> httpSecurityCustomizer() {
 		return h -> h.csrf(AbstractHttpConfigurer::disable)
-			.authorizeHttpRequests(ar -> ar.requestMatchers("/ws").permitAll());
+			.authorizeHttpRequests(ar -> ar.requestMatchers("/ws").permitAll()); // <.>
 	}
 
 	@Override
 	public void addInterceptors(@NonNull List<EndpointInterceptor> interceptors) {
-		interceptors.add(oAuthEndpointInterceptor.getIfAvailable());
+		interceptors.add(oAuthEndpointInterceptor.getIfAvailable()); // <.>
 	}
 
 }
+// end::configuration[]
 
-@Endpoint
+// tag::endpoint[]
+@Endpoint // <.>
 class MessageEndpoint {
 
-	@PayloadRoot(namespace = WsApplication.NS, localPart = "messageRequest")
-	@ResponsePayload
+	@PayloadRoot(namespace = WsApplication.NS, localPart = "messageRequest") // <.>
+	@ResponsePayload // <.>
 	MessageResponse message(@RequestPayload MessageRequest request) {
+		// <.>
 		var authenticatedName = SecurityContextHolder.getContextHolderStrategy()
 			.getContext()
 			.getAuthentication()
@@ -162,3 +169,4 @@ class MessageEndpoint {
 	}
 
 }
+// end::endpoint[]

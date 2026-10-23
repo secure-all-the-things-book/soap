@@ -43,6 +43,7 @@
             JAXB (Java API for XML Binding)
         -->
         <plugins>
+            <!-- tag::jaxb[] -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>jaxb2-maven-plugin</artifactId>
@@ -52,15 +53,18 @@
                         <id>xjc</id>
                         <goals>
                             <goal>xjc</goal>
+                            <!--.-->
                         </goals>
                     </execution>
                 </executions>
                 <configuration>
                     <sources>
                         <source>${project.basedir}/src/main/resources/service.xsd</source>
+                        <!--.-->
                     </sources>
                 </configuration>
             </plugin>
+            <!-- end::jaxb[] -->
             <plugin>
                 <groupId>io.spring.javaformat</groupId>
                 <artifactId>spring-javaformat-maven-plugin</artifactId>
